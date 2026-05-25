@@ -102,6 +102,29 @@ describe("extractJSON", () => {
     expect(extractJSON(json)).toEqual(validResponse);
   });
 
+  it("extracts JSON embedded after prose (model adds preamble)", () => {
+    const json = JSON.stringify(validResponse);
+    const withProse = `Based on my research, here is the answer:\n${json}`;
+    expect(extractJSON(withProse)).toEqual(validResponse);
+  });
+
+  it("extracts JSON from a mid-text code fence (fence not at position 0)", () => {
+    const json = JSON.stringify(validResponse);
+    const withProse = "Here is the result:\n```json\n" + json + "\n```";
+    expect(extractJSON(withProse)).toEqual(validResponse);
+  });
+
+  it("extracts JSON when trailing text follows the closing brace", () => {
+    const json = JSON.stringify(validResponse);
+    const withTrailing = json + "\n\nLet me know if you need more details.";
+    expect(extractJSON(withTrailing)).toEqual(validResponse);
+  });
+
+  it("handles nested objects in the JSON correctly", () => {
+    const nested = { ...validResponse, evidence: [{ content: '{"key": "val"}', source: "lib/a.ts" }] };
+    expect(extractJSON(JSON.stringify(nested))).toEqual(nested);
+  });
+
   it("returns null for non-JSON text", () => {
     expect(extractJSON("This is not JSON.")).toBeNull();
   });

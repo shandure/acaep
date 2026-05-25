@@ -48,16 +48,54 @@ export function parseAssistantResponse(
 
 // ── JSON extraction helper ────────────────────────────────────────────────────
 
-// Models sometimes wrap JSON in markdown code fences despite being told not to.
-// This strips the fences before parsing.
+// Models sometimes wrap JSON in markdown fences or add prose before/after the
+// JSON object despite being instructed not to. This function tries three
+// strategies in order so it handles all common deviation patterns.
 export function extractJSON(text: string): unknown {
-  const cleaned = text
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/\s*```$/, "")
-    .trim();
+  // 1. Happy path: the whole response is valid JSON
   try {
-    return JSON.parse(cleaned);
+    return JSON.parse(text.trim());
   } catch {
-    return null;
+    // fall through
   }
+
+  // 2. JSON is wrapped in a code fence anywhere in the text
+  const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (fenceMatch) {
+    try {
+      return JSON.parse(fenceMatch[1]);
+    } catch {
+      // fall through
+    }
+  }
+
+  // 3. Find the first '{' and walk to its matching '}' character-by-character,
+  //    handling nested objects and string literals correctly.
+  const start = text.indexOf("{");
+  if (start === -1) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (escape) { escape = false; continue; }
+    if (ch === "\\" && inString) { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === "{") depth++;
+    if (ch === "}") {
+      depth--;
+      if (depth === 0) {
+        try {
+          return JSON.parse(text.slice(start, i + 1));
+        } catch {
+          return null;
+        }
+      }
+    }
+  }
+
+  return null;
 }
