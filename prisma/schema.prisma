@@ -1,0 +1,143 @@
+generator client {
+  provider        = "prisma-client"
+  output          = "../app/generated/prisma"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  extensions = [pgvector(map: "vector")]
+}
+
+// ── Documents ingested into the knowledge base ──────────────────
+model Document {
+  id        String   @id @default(cuid())
+  name      String
+  path      String   @unique
+  type      String   // "code" | "markdown" | "policy"
+  content   String
+  createdAt DateTime @default(now())
+  chunks    Chunk[]
+}
+
+// ── Chunks created by the chunker ───────────────────────────────
+model Chunk {
+  id         String                      @id @default(cuid())
+  documentId String
+  document   Document                    @relation(fields: [documentId], references: [id])
+  content    String
+  startLine  Int?
+  endLine    Int?
+  embedding  Unsupported("vector(1536)")?
+  createdAt  DateTime                    @default(now())
+  retrievals RetrievedChunk[]
+}
+
+// ── Prompt versions ─────────────────────────────────────────────
+model Prompt {
+  id           String    @id @default(cuid())
+  name         String
+  version      Int
+  systemText   String
+  userTemplate String
+  isActive     Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  evalRuns     EvalRun[]
+}
+
+// ── Golden test cases ───────────────────────────────────────────
+model TestCase {
+  id                  String       @id @default(cuid())
+  query               String
+  expectedAnswer      String
+  requiredEvidence    String[]
+  expectedFiles       String[]
+  expectedTools       String[]
+  unacceptablePhrases String[]
+  scoringNotes        String?
+  category            String       // "retrieval" | "tool-use" | "reasoning" | "classification"
+  difficulty          String       // "easy" | "medium" | "hard"
+  createdAt           DateTime     @default(now())
+  results             EvalResult[]
+}
+
+// ── An evaluation run (one prompt version against all test cases) ─
+model EvalRun {
+  id               String       @id @default(cuid())
+  promptId         String
+  prompt           Prompt       @relation(fields: [promptId], references: [id])
+  modelName        String
+  startedAt        DateTime     @default(now())
+  completedAt      DateTime?
+  status           String       // "running" | "completed" | "failed"
+  totalCases       Int          @default(0)
+  passCount        Int          @default(0)
+  failCount        Int          @default(0)
+  passRate         Float?
+  avgLatencyMs     Float?
+  totalTokens      Int          @default(0)
+  estimatedCostUsd Float?
+  results          EvalResult[]
+}
+
+// ── Per-test-case result within a run ───────────────────────────
+model EvalResult {
+  id                 String           @id @default(cuid())
+  evalRunId          String
+  evalRun            EvalRun          @relation(fields: [evalRunId], references: [id])
+  testCaseId         String
+  testCase           TestCase         @relation(fields: [testCaseId], references: [id])
+  modelOutput        Json
+  finalAnswer        String
+  passed             Boolean
+  failureReason      String?
+  answerScore        Float
+  evidenceScore      Float
+  retrievalPrecision Float
+  retrievalRecall    Float
+  toolSelectionScore Float
+  hallucinated       Boolean
+  latencyMs          Int
+  promptTokens       Int
+  completionTokens   Int
+  estimatedCostUsd   Float
+  createdAt          DateTime         @default(now())
+  toolCallLogs       ToolCallLog[]
+  retrievedChunks    RetrievedChunk[]
+}
+
+// ── Tool call log ────────────────────────────────────────────────
+model ToolCallLog {
+  id           String     @id @default(cuid())
+  evalResultId String
+  evalResult   EvalResult @relation(fields: [evalResultId], references: [id])
+  toolName     String
+  inputArgs    Json
+  outputResult Json
+  durationMs   Int
+  success      Boolean
+  errorMessage String?
+  createdAt    DateTime   @default(now())
+}
+
+// ── Chunks retrieved during a run ───────────────────────────────
+model RetrievedChunk {
+  id           String     @id @default(cuid())
+  evalResultId String
+  evalResult   EvalResult @relation(fields: [evalResultId], references: [id])
+  chunkId      String
+  chunk        Chunk      @relation(fields: [chunkId], references: [id])
+  similarity   Float
+  rank         Int
+  wasUsed      Boolean
+  createdAt    DateTime   @default(now())
+}
+
+// ── Human feedback (stretch goal) ───────────────────────────────
+model HumanFeedback {
+  id           String   @id @default(cuid())
+  evalResultId String   @unique
+  rating       Int
+  notes        String?
+  createdAt    DateTime @default(now())
+}
