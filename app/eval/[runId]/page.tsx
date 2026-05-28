@@ -98,7 +98,11 @@ export default function RunDetailPage() {
 
       {/* Avg metric scores */}
       <div className="mb-6 flex flex-wrap gap-6 rounded-lg border border-gray-200 bg-white px-6 py-4">
-        <AvgScore label="Avg answer" scores={results.map(r => r.answerScore)} />
+        {run.avgJudgeScore != null ? (
+          <AvgScore label="Avg judge" scores={results.filter(r => r.judgeScore != null).map(r => r.judgeScore as number)} />
+        ) : (
+          <AvgScore label="Avg answer" scores={results.map(r => r.answerScore)} />
+        )}
         <AvgScore label="Avg evidence" scores={results.map(r => r.evidenceScore)} />
         <AvgScore label="Avg precision" scores={results.map(r => r.retrievalPrecision)} />
         <AvgScore label="Avg recall" scores={results.map(r => r.retrievalRecall)} />

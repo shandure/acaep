@@ -2,6 +2,7 @@
 import { useState } from "react";
 import type { CaseResult } from "./types";
 import { pct, scoreColor, CATEGORY_COLORS, DIFFICULTY_COLORS } from "./types";
+import { FeedbackWidget } from "./FeedbackWidget";
 
 function ScoreCell({ label, value }: { label: string; value: number }) {
   return (
@@ -62,7 +63,11 @@ export function ResultRow({ result }: { result: CaseResult }) {
         {/* Scores */}
         <td className="py-2 pr-6 text-right">
           <div className="flex justify-end gap-4">
-            <ScoreCell label="answer" value={result.answerScore} />
+            {result.judgeScore !== null && result.judgeScore !== undefined ? (
+              <ScoreCell label="judge" value={result.judgeScore} />
+            ) : (
+              <ScoreCell label="answer" value={result.answerScore} />
+            )}
             <ScoreCell label="evidence" value={result.evidenceScore} />
             <ScoreCell label="precision" value={result.retrievalPrecision} />
             <ScoreCell label="tools" value={result.toolSelectionScore} />
@@ -122,7 +127,16 @@ export function ResultRow({ result }: { result: CaseResult }) {
                   </div>
                 </div>
               )}
+              {result.judgeScore !== null && result.judgeScore !== undefined && (
+                <div className="sm:col-span-2">
+                  <p className="mb-1 font-semibold text-gray-500 uppercase tracking-wide text-[10px]">Judge reasoning</p>
+                  <p className={`text-xs ${scoreColor(result.judgeScore)}`}>
+                    {pct(result.judgeScore)} — {result.judgeReasoning}
+                  </p>
+                </div>
+              )}
             </div>
+            <FeedbackWidget evalResultId={result.id} initial={result.humanFeedback} />
           </td>
         </tr>
       )}

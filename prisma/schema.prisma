@@ -77,6 +77,7 @@ model EvalRun {
   avgLatencyMs     Float?
   totalTokens      Int          @default(0)
   estimatedCostUsd Float?
+  avgJudgeScore    Float?
   results          EvalResult[]
 }
 
@@ -97,6 +98,8 @@ model EvalResult {
   retrievalRecall    Float
   toolSelectionScore Float
   hallucinated       Boolean
+  judgeScore         Float?           // LLM-as-judge semantic score (0–1), null if judge not run
+  judgeReasoning     String?          // One-sentence explanation from the judge model
   latencyMs          Int
   promptTokens       Int
   completionTokens   Int
@@ -104,6 +107,7 @@ model EvalResult {
   createdAt          DateTime         @default(now())
   toolCallLogs       ToolCallLog[]
   retrievedChunks    RetrievedChunk[]
+  humanFeedback      HumanFeedback?
 }
 
 // ── Tool call log ────────────────────────────────────────────────
@@ -133,11 +137,13 @@ model RetrievedChunk {
   createdAt    DateTime   @default(now())
 }
 
-// ── Human feedback (stretch goal) ───────────────────────────────
+// ── Human feedback ──────────────────────────────────────────────
 model HumanFeedback {
-  id           String   @id @default(cuid())
-  evalResultId String   @unique
-  rating       Int
+  id           String     @id @default(cuid())
+  evalResultId String     @unique
+  evalResult   EvalResult @relation(fields: [evalResultId], references: [id])
+  rating       Int        // 1 = thumbs up, 0 = thumbs down
   notes        String?
-  createdAt    DateTime @default(now())
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 }

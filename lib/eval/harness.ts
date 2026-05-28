@@ -7,17 +7,23 @@ import type { AssistantResponse } from "../ai/structured-output";
 import { retrieve } from "../retrieval/retriever";
 import { prisma } from "../db";
 import { scoreResult } from "./scorer";
+import { judgeAnswer } from "./judge";
 import { loadTestCases } from "./test-cases";
 import { finaliseRun } from "./reporter";
 
 export interface RunOptions {
   promptId: string;
   modelName?: string;
+  useJudge?: boolean; // default true — set false to skip LLM judging (faster/cheaper)
   onProgress?: (completed: number, total: number, passed: boolean) => void;
 }
 
+// Judge pass threshold — semantic score is more reliable than keyword overlap,
+// so we use a higher bar (0.6 vs 0.4 for keyword).
+const JUDGE_PASS_THRESHOLD = 0.6;
+
 export async function runEvaluation(options: RunOptions): Promise<string> {
-  const { promptId, modelName = "gpt-4o", onProgress } = options;
+  const { promptId, modelName = "gpt-4o", useJudge = true, onProgress } = options;
 
   const prompt = await prisma.prompt.findUniqueOrThrow({ where: { id: promptId } });
   const testCases = await loadTestCases();
@@ -78,7 +84,21 @@ export async function runEvaluation(options: RunOptions): Promise<string> {
         : zeroScores(latencyMs);
 
       if (failureReason) scores.failureReason = failureReason;
-      passed = scores.passed;
+
+      // LLM-as-judge — runs after keyword scoring for a semantic quality signal.
+      // Only called when parsed output is valid (no point judging an empty answer).
+      let judgeScore: number | null = null;
+      let judgeReasoning: string | null = null;
+      if (useJudge && parsed.success && output.answer) {
+        const judgment = await judgeAnswer(tc.query, tc.expectedAnswer, output.answer);
+        judgeScore = judgment.score;
+        judgeReasoning = judgment.reasoning;
+      }
+
+      // Judge score overrides keyword-based pass/fail when available
+      passed = judgeScore !== null
+        ? judgeScore >= JUDGE_PASS_THRESHOLD && !scores.hallucinated
+        : scores.passed;
 
       const evalResult = await prisma.evalResult.create({
         data: {
@@ -86,7 +106,7 @@ export async function runEvaluation(options: RunOptions): Promise<string> {
           testCaseId: tc.id,
           modelOutput: output as object,
           finalAnswer: output.answer,
-          passed: scores.passed,
+          passed,
           failureReason: scores.failureReason,
           answerScore: scores.answerScore,
           evidenceScore: scores.evidenceScore,
@@ -94,6 +114,8 @@ export async function runEvaluation(options: RunOptions): Promise<string> {
           retrievalRecall: scores.retrievalRecall,
           toolSelectionScore: scores.toolSelectionScore,
           hallucinated: scores.hallucinated,
+          judgeScore,
+          judgeReasoning,
           latencyMs: scores.latencyMs,
           promptTokens: scores.promptTokens,
           completionTokens: scores.completionTokens,

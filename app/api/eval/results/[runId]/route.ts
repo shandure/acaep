@@ -23,6 +23,7 @@ export async function GET(
             },
           },
           toolCallLogs: { orderBy: { createdAt: "asc" } },
+          humanFeedback: true,
         },
         orderBy: { createdAt: "asc" },
       },

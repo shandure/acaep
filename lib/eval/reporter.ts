@@ -25,6 +25,12 @@ export async function finaliseRun(runId: string): Promise<void> {
     0
   );
 
+  const judgedResults = results.filter(r => r.judgeScore !== null);
+  const avgJudgeScore =
+    judgedResults.length > 0
+      ? judgedResults.reduce((sum, r) => sum + (r.judgeScore ?? 0), 0) / judgedResults.length
+      : null;
+
   await prisma.evalRun.update({
     where: { id: runId },
     data: {
@@ -36,6 +42,7 @@ export async function finaliseRun(runId: string): Promise<void> {
       avgLatencyMs,
       totalTokens,
       estimatedCostUsd,
+      avgJudgeScore,
     },
   });
 }

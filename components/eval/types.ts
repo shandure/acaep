@@ -9,9 +9,15 @@ export interface RunSummary {
   avgLatencyMs: number | null;
   totalTokens: number;
   estimatedCostUsd: number | null;
+  avgJudgeScore: number | null;
   startedAt: string;
   completedAt: string | null;
   prompt: { name: string; version: number };
+}
+
+export interface HumanFeedback {
+  rating: number;   // 1 = thumbs up, 0 = thumbs down
+  notes?: string | null;
 }
 
 export interface CaseResult {
@@ -24,9 +30,12 @@ export interface CaseResult {
   retrievalRecall: number;
   toolSelectionScore: number;
   hallucinated: boolean;
+  judgeScore: number | null;
+  judgeReasoning: string | null;
   latencyMs: number;
   failureReason: string | null;
   finalAnswer?: string;
+  humanFeedback?: HumanFeedback | null;
   testCase: {
     query: string;
     category: string;

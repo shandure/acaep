@@ -25,6 +25,7 @@ See `README.md` for full architecture, schema, setup, and design decisions.
 | Phase 5 — Dashboard | ✅ Done | /dashboard run list, /eval/[runId] detail, /eval/compare, PromptCompareView, system-v2 prompt | Run list, per-case detail, prompt comparison |
 | Phase 6 — Telemetry + security | ✅ Done | Logger, sanitiser, injection detection, 30 new tests |
 | Phase 7 — Tests + docs | ✅ Done | Integration tests (22), full README (phases 3-7 documented) |
+| Phase 8 — Stretch features | ✅ Done | Judge model (gpt-4o-mini), Langfuse tracing, human feedback UI, GitHub Actions CI |
 
 ## Critical patterns to know
 
@@ -102,6 +103,11 @@ Run `npm run db:generate` after any schema change.
 | Unit tests | `tests/unit/` |
 | Telemetry logger | `lib/telemetry/logger.ts` |
 | Security sanitizer | `lib/security/sanitizer.ts` |
+| Judge model | `lib/eval/judge.ts` |
+| Feedback API | `app/api/feedback/route.ts` |
+| Feedback widget | `components/eval/FeedbackWidget.tsx` |
+| CI workflow | `.github/workflows/ci.yml` |
+| Manual eval workflow | `.github/workflows/eval.yml` |
 
 ## Commands
 

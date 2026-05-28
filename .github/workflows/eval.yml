@@ -1,0 +1,67 @@
+name: Eval run
+
+on:
+  workflow_dispatch:
+    inputs:
+      prompt_version:
+        description: Prompt version to evaluate (v1 or v2)
+        required: false
+        default: v1
+        type: choice
+        options: [v1, v2]
+
+jobs:
+  eval:
+    name: Run evaluation harness
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+          POSTGRES_DB: acaep
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5433/acaep
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run migrations
+        run: npm run db:migrate
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Seed prompts
+        run: npm run seed:prompt
+
+      - name: Seed test cases
+        run: npm run seed:cases
+
+      - name: Ingest knowledge base
+        run: npm run ingest
+
+      - name: Run evaluation
+        run: npm run eval:run
+        env:
+          EVAL_PROMPT_VERSION: ${{ inputs.prompt_version }}
